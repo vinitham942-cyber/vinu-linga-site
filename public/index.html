@@ -649,7 +649,7 @@ const IMAGES = [
     {src:'photos/photo12.JPG',caption:'Forever, Boochu ♡'}
 ];
 
-function initGallery() { buildDots(); updateSlide(); }
+function preloadGalleryImages() {   IMAGES.forEach(item => {     const img = new Image();     img.src = item.src;   }); }  function initGallery() {   preloadGalleryImages();   buildDots();   updateSlide(); }
 function buildDots() {
     const w = document.getElementById('g-dots'); w.innerHTML = '';
     IMAGES.forEach((_, i) => { const d = document.createElement('div'); d.className = 'sdot'+(i===S.slideIdx?' on':''); d.onclick = () => { S.slideIdx = i; updateSlide(); }; w.appendChild(d); });
@@ -657,7 +657,7 @@ function buildDots() {
 function updateSlide() {
     const img = document.getElementById('slideImage');
     img.style.opacity = '0'; img.style.transform = 'scale(0.96)';
-    setTimeout(() => { img.src = IMAGES[S.slideIdx].src; img.style.opacity = '1'; img.style.transform = 'scale(1)'; document.getElementById('caption').textContent = IMAGES[S.slideIdx].caption; }, 320);
+    setTimeout(() => { img.src = IMAGES[S.slideIdx].src; img.style.opacity = '1'; img.style.transform = 'scale(1)'; document.getElementById('caption').textContent = IMAGES[S.slideIdx].caption; }, 50);
     document.getElementById('g-count').textContent = `${S.slideIdx+1} / ${IMAGES.length}`;
     document.querySelectorAll('.sdot').forEach((d, i) => d.classList.toggle('on', i === S.slideIdx));
     apiPost('/api/track', { type: 'photo', photo_idx: S.slideIdx });
