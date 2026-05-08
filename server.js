@@ -89,6 +89,15 @@ function dbAll(sql, params = []) {
 
 // ── MIDDLEWARE ────────────────────────────────────────
 app.use(express.json({ limit: '50kb' }));
+
+// Fix for iOS Safari — needs correct MIME type for .wasm (used by sql.js)
+app.use((req, res, next) => {
+  if (req.path.endsWith('.wasm')) {
+    res.setHeader('Content-Type', 'application/wasm');
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const rateMap = new Map();
