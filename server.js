@@ -1,6 +1,7 @@
 /**
  * Vinu & Linga — Anniversary Site
- * Uses sql.js (pure JS SQLite — no native compilation needed)
+ * Storage: plain JSON files in /tmp — no SQLite, no WebAssembly
+ * Works on iPhone, Android, all browsers
  */
 
 const express = require('express');
@@ -13,93 +14,27 @@ const PORT = process.env.PORT || 3000;
 const USER_PIN  = process.env.USER_PIN  || '85191619';
 const ADMIN_PIN = process.env.ADMIN_PIN || '19161916';
 
-// ── DB SETUP (sql.js) ─────────────────────────────────
-const initSqlJs = require('sql.js');
-const DB_PATH   = path.join('/tmp', 'love.db');
+// ── JSON FILE STORAGE ─────────────────────────────────
+const DATA_FILE = '/tmp/love-data.json';
 
-let db;
-
-async function initDB() {
-  const SQL = await initSqlJs();
-
-  if (fs.existsSync(DB_PATH)) {
-    const fileBuffer = fs.readFileSync(DB_PATH);
-    db = new SQL.Database(fileBuffer);
-  } else {
-    db = new SQL.Database();
-  }
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      content TEXT NOT NULL,
-      mood TEXT DEFAULT 'happy',
-      device TEXT, ip TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS quiz_scores (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      score INTEGER NOT NULL, total INTEGER DEFAULT 6,
-      time_taken INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS gallery_views (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      photo_idx INTEGER NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS visits (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      page TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  saveDB();
+function loadData() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    }
+  } catch (e) {}
+  return { messages: [], quizScores: [], galleryViews: [], visits: [], nextId: 1 };
 }
 
-function saveDB() {
-  const data = db.export();
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
-}
-
-function dbRun(sql, params = []) {
-  db.run(sql, params);
-  saveDB();
-}
-
-function dbGet(sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  if (stmt.step()) {
-    return stmt.getAsObject();
-  }
-  return null;
-}
-
-function dbAll(sql, params = []) {
-  const results = [];
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  while (stmt.step()) {
-    results.push(stmt.getAsObject());
-  }
-  return results;
+function saveData(data) {
+  try { fs.writeFileSync(DATA_FILE, JSON.stringify(data)); } catch (e) {}
 }
 
 // ── MIDDLEWARE ────────────────────────────────────────
 app.use(express.json({ limit: '50kb' }));
-
-// Fix for iOS Safari — needs correct MIME type for .wasm (used by sql.js)
-app.use((req, res, next) => {
-  if (req.path.endsWith('.wasm')) {
-    res.setHeader('Content-Type', 'application/wasm');
-  }
-  next();
-});
-
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Rate limiter
 const rateMap = new Map();
 function rateLimit(ip, max = 5, ms = 60000) {
   const now = Date.now(), r = rateMap.get(ip) || { n: 0, t: now };
@@ -108,6 +43,7 @@ function rateLimit(ip, max = 5, ms = 60000) {
   r.n++; rateMap.set(ip, r); return true;
 }
 
+// Admin sessions
 const adminSessions = new Set();
 function requireAdmin(req, res, next) {
   const t = req.headers['x-session'] || req.query.session;
@@ -121,7 +57,6 @@ app.post('/api/auth', (req, res) => {
   if (!rateLimit(ip, 10, 60000)) return res.status(429).json({ error: 'Too many attempts' });
   const { pin } = req.body;
   if (!pin) return res.status(400).json({ error: 'No PIN' });
-
   if (pin === ADMIN_PIN) {
     const token = Date.now().toString(36) + Math.random().toString(36).slice(2);
     adminSessions.add(token);
@@ -139,60 +74,82 @@ app.post('/api/message', (req, res) => {
   const { content, mood, device } = req.body;
   if (!content?.trim()) return res.status(400).json({ error: 'Empty' });
   if (content.length > 3000) return res.status(400).json({ error: 'Too long' });
-  dbRun('INSERT INTO messages (content,mood,device,ip) VALUES (?,?,?,?)',
-    [content.trim(), mood || 'happy', device || null, ip]);
+  const data = loadData();
+  data.messages.push({
+    id: data.nextId++,
+    content: content.trim(),
+    mood: mood || 'happy',
+    device: device || null,
+    ip,
+    created_at: new Date().toISOString()
+  });
+  saveData(data);
   res.json({ ok: true });
 });
 
 app.get('/api/message', (req, res) => {
-  const row = dbGet('SELECT content,mood,created_at FROM messages ORDER BY id DESC LIMIT 1');
-  res.json(row || null);
+  const data = loadData();
+  const last = data.messages[data.messages.length - 1] || null;
+  res.json(last ? { content: last.content, mood: last.mood, created_at: last.created_at } : null);
 });
 
 app.post('/api/quiz', (req, res) => {
   const { score, total, time_taken } = req.body;
   if (typeof score !== 'number') return res.status(400).json({ error: 'Bad score' });
-  dbRun('INSERT INTO quiz_scores (score,total,time_taken) VALUES (?,?,?)',
-    [score, total || 6, time_taken || 0]);
+  const data = loadData();
+  data.quizScores.push({ id: data.nextId++, score, total: total || 6, time_taken: time_taken || 0, created_at: new Date().toISOString() });
+  saveData(data);
   res.json({ ok: true });
 });
 
 app.post('/api/track', (req, res) => {
   const { type, page, photo_idx } = req.body;
+  const data = loadData();
   if (type === 'visit' && page)
-    dbRun('INSERT INTO visits (page) VALUES (?)', [String(page)]);
+    data.visits.push({ id: data.nextId++, page: String(page), created_at: new Date().toISOString() });
   else if (type === 'photo' && typeof photo_idx === 'number')
-    dbRun('INSERT INTO gallery_views (photo_idx) VALUES (?)', [photo_idx]);
+    data.galleryViews.push({ id: data.nextId++, photo_idx, created_at: new Date().toISOString() });
+  saveData(data);
   res.json({ ok: true });
 });
 
 // ── ADMIN API ─────────────────────────────────────────
 app.get('/api/admin/stats', requireAdmin, (req, res) => {
-  const totalMessages = dbGet('SELECT COUNT(*) AS c FROM messages')?.c || 0;
-  const totalVisits   = dbGet('SELECT COUNT(*) AS c FROM visits')?.c || 0;
-  const quizAttempts  = dbGet('SELECT COUNT(*) AS c FROM quiz_scores')?.c || 0;
-  const avgRow        = dbGet('SELECT AVG(score*100.0/total) AS a FROM quiz_scores');
-  const topPhoto      = dbGet('SELECT photo_idx,COUNT(*) AS c FROM gallery_views GROUP BY photo_idx ORDER BY c DESC LIMIT 1');
-  const moodBreakdown = dbAll("SELECT mood,COUNT(*) AS c FROM messages GROUP BY mood");
+  const data = loadData();
+  const avgScore = data.quizScores.length
+    ? Math.round(data.quizScores.reduce((a, s) => a + s.score * 100 / s.total, 0) / data.quizScores.length)
+    : 0;
+  const photoCount = {};
+  data.galleryViews.forEach(v => { photoCount[v.photo_idx] = (photoCount[v.photo_idx] || 0) + 1; });
+  const topPhotoIdx = Object.entries(photoCount).sort((a, b) => b[1] - a[1])[0];
+  const moodCount = {};
+  data.messages.forEach(m => { moodCount[m.mood] = (moodCount[m.mood] || 0) + 1; });
+  const moodBreakdown = Object.entries(moodCount).map(([mood, c]) => ({ mood, c }));
   res.json({
-    totalMessages, totalVisits, quizAttempts,
-    avgScore: Math.round(avgRow?.a || 0),
-    topPhoto: topPhoto || null,
+    totalMessages: data.messages.length,
+    totalVisits: data.visits.length,
+    quizAttempts: data.quizScores.length,
+    avgScore,
+    topPhoto: topPhotoIdx ? { photo_idx: Number(topPhotoIdx[0]), c: topPhotoIdx[1] } : null,
     moodBreakdown
   });
 });
 
 app.get('/api/admin/messages', requireAdmin, (req, res) => {
-  res.json(dbAll('SELECT * FROM messages ORDER BY id DESC'));
+  const data = loadData();
+  res.json([...data.messages].reverse());
 });
 
 app.delete('/api/admin/messages/:id', requireAdmin, (req, res) => {
-  dbRun('DELETE FROM messages WHERE id=?', [req.params.id]);
+  const data = loadData();
+  data.messages = data.messages.filter(m => m.id !== Number(req.params.id));
+  saveData(data);
   res.json({ ok: true });
 });
 
 app.get('/api/admin/quiz-scores', requireAdmin, (req, res) => {
-  res.json(dbAll('SELECT * FROM quiz_scores ORDER BY id DESC LIMIT 100'));
+  const data = loadData();
+  res.json([...data.quizScores].reverse().slice(0, 100));
 });
 
 // ── CATCH-ALL ─────────────────────────────────────────
@@ -201,13 +158,8 @@ app.get('*', (req, res) => {
 });
 
 // ── START ─────────────────────────────────────────────
-initDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`\n💖 Server running at http://localhost:${PORT}`);
-    console.log(`   User PIN:  ${USER_PIN}`);
-    console.log(`   Admin PIN: ${ADMIN_PIN}\n`);
-  });
-}).catch(err => {
-  console.error('DB init failed:', err);
-  process.exit(1);
+app.listen(PORT, () => {
+  console.log(`\n💖 Server running at http://localhost:${PORT}`);
+  console.log(`   User PIN:  ${USER_PIN}`);
+  console.log(`   Admin PIN: ${ADMIN_PIN}\n`);
 });
