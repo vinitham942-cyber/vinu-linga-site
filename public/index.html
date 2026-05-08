@@ -311,7 +311,18 @@
     <h2 class="serif">Moments</h2>
     <div class="caption" id="caption"></div>
     <div class="g-frame" id="g-frame">
-        <img id="slideImage" src="photos/photo1.jpg" alt="Our memory">
+        <img class="slide-img" src="photos/photo1.jpg" alt="Our memory" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:1;transition:opacity .15s;">
+        <img class="slide-img" src="photos/photo2.jpg" alt="Our memory" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s;">
+        <img class="slide-img" src="photos/photo3.jpg" alt="Our memory" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s;">
+        <img class="slide-img" src="photos/photo4.JPG" alt="Our memory" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s;">
+        <img class="slide-img" src="photos/photo5.JPG" alt="Our memory" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s;">
+        <img class="slide-img" src="photos/photo6.jpg" alt="Our memory" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s;">
+        <img class="slide-img" src="photos/photo7.jpg" alt="Our memory" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s;">
+        <img class="slide-img" src="photos/photo8.JPG" alt="Our memory" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s;">
+        <img class="slide-img" src="photos/photo9.jpg" alt="Our memory" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s;">
+        <img class="slide-img" src="photos/photo10.jpg" alt="Our memory" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s;">
+        <img class="slide-img" src="photos/photo11.jpg" alt="Our memory" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s;">
+        <img class="slide-img" src="photos/photo12.JPG" alt="Our memory" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .15s;">
         <div class="g-counter" id="g-count">1 / 12</div>
     </div>
     <div class="swipe-dots" id="g-dots"></div>
@@ -652,19 +663,12 @@ const IMAGES = [
 function initGallery() { buildDots(); updateSlide(); }
 function buildDots() {
     const w = document.getElementById('g-dots'); w.innerHTML = '';
-    IMAGES.forEach((im, i) => { const d = document.createElement('div'); d.className = 'sdot'+(i===S.slideIdx?' on':''); d.onclick = () => { S.slideIdx = i; updateSlide(); }; w.appendChild(d); new Image().src = im.src; });
+    IMAGES.forEach((_, i) => { const d = document.createElement('div'); d.className = 'sdot'+(i===S.slideIdx?' on':''); d.onclick = () => { S.slideIdx = i; updateSlide(); }; w.appendChild(d); });
 }
 function updateSlide() {
-    const img = document.getElementById('slideImage');
-    img.style.opacity = '0'; img.style.transform = 'scale(0.96)';
-    img.src = IMAGES[S.slideIdx].src;
+    const imgs = document.querySelectorAll('.slide-img');
+    imgs.forEach((img, i) => { img.style.opacity = i === S.slideIdx ? '1' : '0'; });
     document.getElementById('caption').textContent = IMAGES[S.slideIdx].caption;
-    // Preload next and previous images
-    const nextIdx = (S.slideIdx + 1) % IMAGES.length;
-    const prevIdx = (S.slideIdx - 1 + IMAGES.length) % IMAGES.length;
-    new Image().src = IMAGES[nextIdx].src;
-    new Image().src = IMAGES[prevIdx].src;
-    setTimeout(() => { img.style.opacity = '1'; img.style.transform = 'scale(1)'; }, 50);
     document.getElementById('g-count').textContent = `${S.slideIdx+1} / ${IMAGES.length}`;
     document.querySelectorAll('.sdot').forEach((d, i) => d.classList.toggle('on', i === S.slideIdx));
     apiPost('/api/track', { type: 'photo', photo_idx: S.slideIdx });
