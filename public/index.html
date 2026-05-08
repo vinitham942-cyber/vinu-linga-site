@@ -590,12 +590,12 @@ function animateLoveMeter() {
 //  QUIZ
 // ─────────────────────────────────────────────────────
 const QUIZ = [
-    {q:'When was our first forehead kiss?',         opts:['14 Feb','16 Oct ','1 Jan'],      a:1},
-    {q:'When was our second Kerala visit?',           opts:['8 Jan','10 Feb','1 March'],           a:0},
+    {q:'When was our first forehead kiss?',         opts:['14 Feb','16 Oct 2022','1 Jan'],      a:1},
+    {q:'When was my second Kerala visit?',           opts:['8 Jan','10 Feb','1 March'],           a:0},
     {q:'When was our first liplock?',                opts:['15 March','20 March','10 April'],     a:0},
-    {q:'When was the first time I gave you money?', opts:['Aug','3 Sept ','Oct'],            a:1},
-    {q:'When did I give you my first gift?',         opts:['14 Feb','7 Feb ','1 Jan'],        a:1},
-    {q:'When was our first hickey?',                 opts:['14 Feb','1 March ','10 March'],   a:1}
+    {q:'When was the first time I gave you money?', opts:['Aug','3 Sept 2023','Oct'],            a:1},
+    {q:'When did I give you my first gift?',         opts:['14 Feb','7 Feb 2026','1 Jan'],        a:1},
+    {q:'When was our first hickey?',                 opts:['14 Feb','1 March 2026','10 March'],   a:1}
 ];
 
 function startQuiz() {
@@ -649,7 +649,7 @@ const IMAGES = [
     {src:'photos/photo12.JPG',caption:'Forever, Boochu ♡'}
 ];
 
-function preloadGalleryImages() {   IMAGES.forEach(item => {     const img = new Image();     img.src = item.src;   }); }  function initGallery() {   preloadGalleryImages();   buildDots();   updateSlide(); }
+function initGallery() { buildDots(); updateSlide(); }
 function buildDots() {
     const w = document.getElementById('g-dots'); w.innerHTML = '';
     IMAGES.forEach((_, i) => { const d = document.createElement('div'); d.className = 'sdot'+(i===S.slideIdx?' on':''); d.onclick = () => { S.slideIdx = i; updateSlide(); }; w.appendChild(d); });
@@ -657,7 +657,7 @@ function buildDots() {
 function updateSlide() {
     const img = document.getElementById('slideImage');
     img.style.opacity = '0'; img.style.transform = 'scale(0.96)';
-    setTimeout(() => { img.src = IMAGES[S.slideIdx].src; img.style.opacity = '1'; img.style.transform = 'scale(1)'; document.getElementById('caption').textContent = IMAGES[S.slideIdx].caption; }, 50);
+    setTimeout(() => { img.src = IMAGES[S.slideIdx].src; img.style.opacity = '1'; img.style.transform = 'scale(1)'; document.getElementById('caption').textContent = IMAGES[S.slideIdx].caption; }, 320);
     document.getElementById('g-count').textContent = `${S.slideIdx+1} / ${IMAGES.length}`;
     document.querySelectorAll('.sdot').forEach((d, i) => d.classList.toggle('on', i === S.slideIdx));
     apiPost('/api/track', { type: 'photo', photo_idx: S.slideIdx });
@@ -695,13 +695,13 @@ I have watched us grow through distance, through time zones, through long silenc
 
 Even though 168 km separates us, my heart has always been exactly where you are.
 
-Seven years. Not just a number — it is every morning text, every late night call, every time you made me laugh when I needed it most.
+Seven years. Not just a number — it is every good morning text, every late night call, every time you made me laugh when I needed it most.
 
 You are my home, my calm, my favourite place in the whole world.
 
 Happy 7th Anniversary, Boochu.
 
-I love you🫂💋`;
+I love you — yesterday, today, and every day that comes after. 🫂💋`;
 
 function startLetter() {
     if (S.letterLive || S.letterDone) return;
